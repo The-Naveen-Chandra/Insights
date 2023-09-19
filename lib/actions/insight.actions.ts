@@ -37,3 +37,37 @@ export async function createInsight({
     throw new Error(`Error creating insight: ${error.message}`);
   }
 }
+
+export async function fetchPost(pageNumber = 1, pageSize = 20) {
+  connectToDB();
+
+  // Calculate the number of posts to skip
+  const skipAmount = (pageNumber - 1) * pageSize;
+
+  // Fetch the posts that have no parents (top-level insights...)
+  const postsQuery = Insight.find({
+    parentId: { $in: [null, undefined] },
+  })
+    .sort({ createdAt: "desc" })
+    .skip(skipAmount)
+    .limit(pageSize)
+    .populate({ path: "author", model: User })
+    .populate({
+      path: "children",
+      populate: {
+        path: "author",
+        model: User,
+        select: "_id name parentId image",
+      },
+    });
+
+  const totalPostsCount = await Insight.countDocuments({
+    parentId: { $in: [null, undefined] },
+  });
+
+  const posts = await postsQuery.exec();
+
+  const isNext = totalPostsCount > skipAmount + posts.length;
+
+  return { posts, isNext };
+}
