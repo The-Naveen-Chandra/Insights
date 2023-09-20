@@ -15,7 +15,9 @@ async function Page() {
   return (
     <>
       <h1 className="head-text">Create Insight</h1>
-      <PostInsight userId={userInfo._id} />
+      {/* Edited by charGPT */}
+      {/* <PostInsight userId={userInfo._id} /> */}
+      <PostInsight userId={userInfo._id.toString()} />
     </>
   );
 }
