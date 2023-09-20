@@ -1,4 +1,5 @@
 import InsightCard from "@/components/cards/InsightCard";
+import Comment from "@/components/forms/Comment";
 import { fetchInsightById } from "@/lib/actions/insight.actions";
 import { fetchUser } from "@/lib/actions/user.actions";
 import { currentUser } from "@clerk/nextjs";
@@ -28,6 +29,14 @@ const Page = async ({ params }: { params: { id: string } }) => {
           community={insight.community}
           createdAt={insight.createdAt}
           comments={insight.children}
+        />
+      </div>
+
+      <div className="mt-7">
+        <Comment
+          insightId={insight.id}
+          currentUserImg={user.imageUrl}
+          currentUserId={JSON.stringify(userInfo._id)}
         />
       </div>
     </section>
