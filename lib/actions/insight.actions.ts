@@ -109,3 +109,42 @@ export async function fetchInsightById(id: string) {
     throw new Error(`Error fetching insight: ${error.message}`);
   }
 }
+
+export async function addCommentToInsight(
+  insightId: string,
+  commentText: string,
+  userId: string,
+  path: string
+) {
+  connectToDB();
+
+  try {
+    // add comment to insight
+    // Find the original insight by its ID
+    const originalInsight = await Insight.findById(insightId);
+
+    if (!originalInsight) {
+      throw new Error("Insight not found");
+    }
+
+    // Create a new insight with the comment text
+    const commentInsight = new Insight({
+      text: commentText,
+      author: userId,
+      parentId: insightId,
+    });
+
+    // Save the new thread
+    const savedCommentInsight = await commentInsight.save();
+
+    // Update the original insight to include the new comment
+    originalInsight.children.push(savedCommentInsight._id);
+
+    // Save te original insight
+    await originalInsight.save();
+
+    revalidatePath(path);
+  } catch (error: any) {
+    throw new Error(`Error adding comment to insight: ${error.message}`);
+  }
+}
