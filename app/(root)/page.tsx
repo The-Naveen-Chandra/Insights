@@ -1,12 +1,19 @@
 import InsightCard from "@/components/cards/InsightCard";
+
 import { fetchPost } from "@/lib/actions/insight.actions";
+import { fetchUser } from "@/lib/actions/user.actions";
 import { currentUser } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 
 export default async function Home() {
-  const result = await fetchPost(1, 30);
   const user = await currentUser();
+  if (!user) return null;
 
-  // console.log(result);
+  // redirect to onboarding if user is not onboarded
+  const userInfo = await fetchUser(user.id);
+  if (!userInfo?.onboarded) redirect("/onboarding");
+
+  const result = await fetchPost(1, 30);
 
   return (
     <>
