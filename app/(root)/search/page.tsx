@@ -2,9 +2,6 @@ import { fetchUser, fetchUsers } from "@/lib/actions/user.actions";
 import { currentUser } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 
-import InsightsTab from "@/components/shared/InsightsTab";
-import ProfileHeader from "@/components/shared/ProfileHeader";
-import Image from "next/image";
 import UserCard from "@/components/cards/UserCard";
 
 async function Page() {
