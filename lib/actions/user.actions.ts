@@ -1,10 +1,26 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import User from "../models/user.model";
-import { connectToDB } from "../mongoose";
-import Insight from "../models/insight.model";
 import { FilterQuery, SortOrder } from "mongoose";
+import { revalidatePath } from "next/cache";
+
+import Community from "../models/community.model";
+import Insight from "../models/insight.model";
+import User from "../models/user.model";
+
+import { connectToDB } from "../mongoose";
+
+export async function fetchUser(userId: string) {
+  try {
+    connectToDB();
+
+    return await User.findOne({ id: userId }).populate({
+      path: "communities",
+      model: Community,
+    });
+  } catch (error: any) {
+    throw new Error(`Failed to fetch user: ${error.message}`);
+  }
+}
 
 interface Params {
   userId: string;
@@ -17,19 +33,17 @@ interface Params {
 
 export async function updateUser({
   userId,
-  username,
-  name,
   bio,
-  image,
+  name,
   path,
+  username,
+  image,
 }: Params): Promise<void> {
-  connectToDB();
-
   try {
+    connectToDB();
+
     await User.findOneAndUpdate(
-      {
-        id: userId,
-      },
+      { id: userId },
       {
         username: username.toLowerCase(),
         name,
@@ -37,9 +51,7 @@ export async function updateUser({
         image,
         onboarded: true,
       },
-      {
-        upsert: true,
-      }
+      { upsert: true }
     );
 
     if (path === "/profile/edit") {
@@ -50,52 +62,44 @@ export async function updateUser({
   }
 }
 
-export async function fetchUser(userId: string) {
-  try {
-    connectToDB();
-
-    return await User.findOne({ id: userId });
-    // .populate({
-    //   path: "communities",
-    //   model: Community,
-    // });
-  } catch (error: any) {
-    throw new Error(`Failed to fetch user: ${error.message}`);
-  }
-}
-
 export async function fetchUserPosts(userId: string) {
   try {
     connectToDB();
 
-    // TODO: Populate with communities
-
-    // Find all insights that the user has created
+    // Find all insights authored by the user with the given userId
     const insights = await User.findOne({ id: userId }).populate({
       path: "insights",
       model: Insight,
-      populate: {
-        path: "children",
-        model: Insight,
-        populate: {
-          path: "author",
-          model: User,
-          select: "name image id",
+      populate: [
+        {
+          path: "community",
+          model: Community,
+          select: "name id image _id", // Select the "name" and "_id" fields from the "Community" model
         },
-      },
+        {
+          path: "children",
+          model: Insight,
+          populate: {
+            path: "author",
+            model: User,
+            select: "name image id", // Select the "name" and "_id" fields from the "User" model
+          },
+        },
+      ],
     });
-
     return insights;
-  } catch (error: any) {
-    throw new Error(`Failed to fetch user posts: ${error.message}`);
+  } catch (error) {
+    console.error("Error fetching user insights:", error);
+    throw error;
   }
 }
 
+// Almost similar to Thead (search + pagination) and Community (search + pagination)
 export async function fetchUsers({
   userId,
   searchString = "",
   pageNumber = 1,
-  pageSize = 10,
+  pageSize = 20,
   sortBy = "desc",
 }: {
   userId: string;
@@ -105,17 +109,20 @@ export async function fetchUsers({
   sortBy?: SortOrder;
 }) {
   try {
-    // connect with db
     connectToDB();
 
+    // Calculate the number of users to skip based on the page number and page size.
     const skipAmount = (pageNumber - 1) * pageSize;
 
+    // Create a case-insensitive regular expression for the provided search string.
     const regex = new RegExp(searchString, "i");
 
+    // Create an initial query object to filter users.
     const query: FilterQuery<typeof User> = {
-      id: { $ne: userId },
+      id: { $ne: userId }, // Exclude the current user from the results.
     };
 
+    // If the search string is not empty, add the $or operator to match either username or name fields.
     if (searchString.trim() !== "") {
       query.$or = [
         { username: { $regex: regex } },
@@ -123,6 +130,7 @@ export async function fetchUsers({
       ];
     }
 
+    // Define the sort options for the fetched users based on createdAt field and provided sort order.
     const sortOptions = { createdAt: sortBy };
 
     const usersQuery = User.find(query)
@@ -130,15 +138,18 @@ export async function fetchUsers({
       .skip(skipAmount)
       .limit(pageSize);
 
+    // Count the total number of users that match the search criteria (without pagination).
     const totalUsersCount = await User.countDocuments(query);
 
     const users = await usersQuery.exec();
 
+    // Check if there are more users beyond the current page.
     const isNext = totalUsersCount > skipAmount + users.length;
 
     return { users, isNext };
-  } catch (error: any) {
-    throw new Error(`Failed to fetch users: ${error.message}`);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    throw error;
   }
 }
 
@@ -146,18 +157,18 @@ export async function getActivity(userId: string) {
   try {
     connectToDB();
 
-    // find all insights created by user
+    // Find all insights created by the user
     const userInsights = await Insight.find({ author: userId });
 
-    // Collect all the child insight ids (replies) form the "children" field
-
+    // Collect all the child insight ids (replies) from the 'children' field of each user insight
     const childInsightIds = userInsights.reduce((acc, userInsight) => {
       return acc.concat(userInsight.children);
     }, []);
 
+    // Find and return the child insights (replies) excluding the ones created by the same user
     const replies = await Insight.find({
       _id: { $in: childInsightIds },
-      author: { $ne: userId },
+      author: { $ne: userId }, // Exclude insights authored by the same user
     }).populate({
       path: "author",
       model: User,
@@ -165,7 +176,8 @@ export async function getActivity(userId: string) {
     });
 
     return replies;
-  } catch (error: any) {
-    throw new Error(`Failed to fetch activity: ${error.message}`);
+  } catch (error) {
+    console.error("Error fetching replies: ", error);
+    throw error;
   }
 }
