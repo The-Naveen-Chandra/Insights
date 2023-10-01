@@ -18,6 +18,7 @@ import { usePathname, useRouter } from "next/navigation";
 // import { updateUser } from "@/lib/actions/user.actions";
 import { InsightValidation } from "@/lib/validations/insight";
 import { createInsight } from "@/lib/actions/insight.actions";
+import { useOrganization } from "@clerk/nextjs";
 
 interface Props {
   user: {
@@ -34,6 +35,7 @@ interface Props {
 function PostInsight({ userId }: { userId: string }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { organization } = useOrganization();
 
   const form = useForm({
     resolver: zodResolver(InsightValidation),
@@ -44,10 +46,12 @@ function PostInsight({ userId }: { userId: string }) {
   });
 
   const onSubmit = async (values: z.infer<typeof InsightValidation>) => {
+    console.log("organization", organization);
+
     await createInsight({
       text: values.insight,
       author: userId,
-      communityId: null,
+      communityId: organization ? organization.id : "",
       path: pathname,
     });
 
